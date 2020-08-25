@@ -80,9 +80,9 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
 
 
         $Authority = $_GET['Authority'];
-        $data = array('MerchantID' => self::get_MerchantID(), 'Authority' => $Authority, 'Amount' => $order->get_price( 'total', array(), 'float' ));
+        $data = array('merchant_id' => self::get_MerchantID(), 'authority' => $Authority, 'amount' => $order->get_price( 'total', array(), 'float' ));
         $jsonData = json_encode($data);
-        $ch = curl_init('https://www.zarinpal.com/pg/rest/WebGate/PaymentVerification.json');
+        $ch = curl_init('https://api.zarinpal.com/pg/v4/payment/verify.json');
         curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
@@ -98,10 +98,10 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
 
 
 
-        if ($result['Status'] == 100) {
+        if ($result['data']['code'] == 100) {
             $txn_data = array();
             $txn_data['amount'] = $order->get_price( 'total', array(), 'float' );
-            $txn_data['transaction_id'] = $result['RefID'];
+            $txn_data['transaction_id'] = $result ['data']['ref_id'];
             $txn_data['status'] = 'llms-txn-succeeded';
             $txn_data['payment_type'] = 'single';
             $txn_data['source_description'] = isset( $_POST['card_holder'] ) ? $_POST['card_holder'] : '';
@@ -111,13 +111,13 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
             $this->log( $order, 'Zarinpal `confirm_pending_order()` finished' );
 
 
-            $order->add_note('شماره تراکنش : ' . $result['RefID'] );
+            $order->add_note('شماره تراکنش : ' . $result ['data']['ref_id'] );
 
             $this->complete_transaction( $order );
 
         }else{
-            $this->log( $order, 'Zarinpal `confirm_pending_order()` finished with error : ' . $result['Status'] );
-            $order->add_note('Faild Transaction : ' . $result['Status'] );
+            $this->log( $order, 'Zarinpal `confirm_pending_order()` finished with error : ' . $result ['data']['code'] );
+            $order->add_note('Faild Transaction : ' . $result ['data']['code'] );
 
             wp_safe_redirect( llms_cancel_payment_url() );
             exit();
@@ -133,7 +133,7 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
      * @version  1.0.0
      */
     public function get_MerchantID() {
-        return $this->get_option( 'MerchantID' );
+        return $this->get_option( 'merchant_id' );
     }
 
 
@@ -160,12 +160,12 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
             return llms_add_notice( sprintf( __( 'با توجه به محدوديت هاي شاپرك امكان پرداخت با رقم درخواست شده ميسر نمي باشد حداقل مبلغ پرداختی  %s تومان است', 'lifterlms-Zarinpal' ), self::MIN_AMOUNT ), 'error' );
         }
 
-        $data = array('MerchantID' => self::get_MerchantID(),
-            'Amount' => $order->get_price( 'total', array(), 'float' ),
-            'CallbackURL' => llms_confirm_payment_url( $order->get( 'order_key' )),
-            'Description' => $order->get( 'order_key' ));
+        $data = array('merchant_id' => self::get_MerchantID(),
+            'amount' => $order->get_price( 'total', array(), 'float' ),
+            'callback_url' => llms_confirm_payment_url( $order->get( 'order_key' )),
+            'description' => $order->get( 'order_key' ));
         $jsonData = json_encode($data);
-        $ch = curl_init('https://www.zarinpal.com/pg/rest/WebGate/PaymentRequest.json');
+        $ch = curl_init('https://api.zarinpal.com/pg/v4/payment/request.json');
         curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v1');
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
@@ -179,18 +179,18 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
         $result = json_decode($result, true);
         curl_close($ch);
 
-        if($result["Status"] == 100)
+        if ($result['data']['code'] == 100)
         {
             $this->log( $r, 'Zarinpal `handle_pending_order()` finished' );
             do_action( 'lifterlms_handle_pending_order_complete', $order );
-            $order->add_note('transaction ID : ' . $result["Authority"] );
-            wp_redirect( self::REDIRECT_URL . $result["Authority"] );
+            $order->add_note('transaction ID : ' . $result['data']["authority"] );
+            wp_redirect( self::REDIRECT_URL . $result['data']["authority"] );
             exit();
         }
         else
         {
             $this->log( $r, 'Zarinpal `handle_pending_order()` finished with error code : ' );
-            return llms_add_notice( 'خطا در اتصال به درگاه : ' . $result["Status"] , 'error' );
+            return llms_add_notice( 'خطا در اتصال به درگاه : ' . $result['errors']['code'], 'error' );
         }
 
     }
