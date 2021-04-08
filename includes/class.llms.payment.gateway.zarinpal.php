@@ -184,7 +184,15 @@ class LLMS_Payment_Gateway_Zarinpal extends LLMS_Payment_Gateway {
             $this->log( $r, 'Zarinpal `handle_pending_order()` finished' );
             do_action( 'lifterlms_handle_pending_order_complete', $order );
             $order->add_note('transaction ID : ' . $result['data']["authority"] );
-            wp_redirect( self::REDIRECT_URL . $result['data']["authority"] );
+            echo'
+<script type="text/javascript" src="https://cdn.zarinpal.com/zarinak/v1/checkout.js"></script>
+<script type="text/javascript">
+    window.onload = function () {
+        Zarinak.setAuthority("' . $result['data']["authority"] . '");
+        Zarinak.showQR();
+        Zarinak.open();
+    };
+</script>';
             exit();
         }
         else
